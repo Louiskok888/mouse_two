@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Dot Game</title>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        document.body.appendChild(canvas);
+
+        let cursorRadius = 10;
+        let cursorX = canvas.width / 2;
+        let cursorY = canvas.height / 2;
+
+        let score = 0;
+        let timeLeft = 30;
+        let fruits = [];
+
+        // Generate random colors for fruits
+        function getRandomColor() {
+            const letters = "0123456789ABCDEF";
+            let color = "#";
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        // Create a fruit at a random position
+        function createFruit() {
+            return {
+                x: Math.random() * (canvas.width - 20) + 10,
+                y: Math.random() * (canvas.height - 20) + 10,
+                radius: 10,
+                color: getRandomColor()
+            };
+        }
+
+        // Spawn initial fruits
+        function spawnFruits() {
+            for (let i = 0; i < 10; i++) {
+                fruits.push(createFruit());
+            }
+        }
+
+        // Handle touch events for player movement
+        canvas.addEventListener("touchmove", (event) => {
+            const touch = event.touches[0];
+            cursorX = touch.clientX;
+            cursorY = touch.clientY;
+
+            // Send player movement to the server
+            socket.emit('move', { x: cursorX, y: cursorY });
+        });
+
+        // Draw the game elements
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw the fruit
+            fruits.forEach(fruit => {
+                ctx.fillStyle = fruit.color;
+                ctx.beginPath();
+                ctx.arc(fruit.x, fruit.y, fruit.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Draw player cursor
+            ctx.fillStyle = "blue";
+            ctx.beginPath();
+            ctx.arc(cursorX, cursorY, cursorRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw score and time left
+            ctx.fillStyle = "black";
+            ctx.font = "20px Arial";
+            ctx.fillText("Score: " + score, 10, 30);
+            ctx.fillText("Time Left: " + timeLeft, 10, 60);
+        }
+
+        // Update the game logic (e.g., collision, timing)
+        function update() {
+            draw();
+        }
+
+        // Start the game loop
+        function gameLoop() {
+            if (timeLeft > 0) {
+                timeLeft--;
+            }
+
+            update();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Update player positions from the server
+        socket.on('updatePositions', (players) => {
+            // For simplicity, assume there's only one player for this client
+            const player = Object.values(players)[0];
+            cursorX = player.x;
+            cursorY = player.y;
+        });
+
+        // Update scores from the server
+        socket.on('updateScores', (players) => {
+            const player = Object.values(players)[0];
+            score = player.score;
+        });
+
+        // Start the game
+        spawnFruits();
+        gameLoop();
+    </script>
+</body>
+</html>
